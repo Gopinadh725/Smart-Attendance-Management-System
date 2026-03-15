@@ -1,45 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { QRCodeSVG } from 'qrcode.react'; // Updated library usage
+import React from 'react';
 
-const FacultyQR = ({ subjectId }) => {
-    const [qrData, setQrData] = useState(null);
-    const [timeLeft, setTimeLeft] = useState(0);
-
-    const handleGenerate = async () => {
-        try {
-            const res = await axios.post('/api/attendance/generate', { subjectId }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
-            setQrData(res.data);
-            // Calculate seconds until expiration
-            setTimeLeft(Math.floor((new Date(res.data.expiresAt) - new Date()) / 1000));
-        } catch (err) {
-            alert(err.response?.data?.message || "Error generating QR");
-        }
-    };
-
-    useEffect(() => {
-        if (timeLeft > 0) {
-            const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [timeLeft]);
-
-    return (
-        <div className="p-4 border rounded">
-            <h3>Generate Attendance QR</h3>
-            <button onClick={handleGenerate} disabled={qrData?.attemptsLeft === 0}>
-                Generate QR ({qrData?.attemptsLeft ?? 5} attempts left)
-            </button>
-
-            {timeLeft > 0 && qrData && (
-                <div className="mt-4">
-                    <QRCodeSVG value={qrData.token} size={200} />
-                    <p>Expires in: {timeLeft} seconds</p>
-                </div>
-            )}
-            {timeLeft === 0 && qrData && <p className="text-red-500">QR Expired. Generate again.</p>}
+const Dashboard = () => {
+  return (
+    <div style={{ padding: '20px' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
+        <h2>Faculty Dashboard</h2>
+        <span>Welcome, Prof. Gopinadh</span>
+      </header>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
+        <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px', textAlign: 'center' }}>
+          <h3>Generate QR Code</h3>
+          <div style={{ background: '#eee', height: '150px', width: '150px', margin: '20px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            [QR Preview]
+          </div>
+          <button style={{ padding: '10px 20px', backgroundColor: '#28a745', color: '#fff', border: 'none', borderRadius: '5px' }}>Generate New QR</button>
+          <p style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>Attempts: 1/5</p>
         </div>
-    );
+        <div style={{ padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
+          <h3>Recent Session Stats</h3>
+          <p>Subject: Web Technologies</p>
+          <p>Students Present: 45 / 50</p>
+          <p>Status: Active</p>
+        </div>
+      </div>
+    </div>
+  );
 };
+
+export default Dashboard;
