@@ -1,13 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { generateQR } = require('../controllers/attendanceController');
+const { 
+    markAttendance, 
+    getAttendanceByDate, 
+    getSubjectAnalytics, 
+    getMyReport 
+} = require('../controllers/attendanceController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Only Faculty can generate QR codes [cite: 11, 14]
-router.post('/generate', protect, authorize('Faculty'), generateQR);
+router.use(protect);
 
-
-// Only Students can scan QR codes [cite: 11]
-router.post('/scan', protect, authorize('Student'), scanQR);
+router.post('/mark', authorize('Faculty', 'Admin'), markAttendance);
+router.get('/:subjectId/:date', authorize('Faculty', 'Admin'), getAttendanceByDate);
+router.get('/analytics/:subjectId', authorize('Faculty', 'Admin', 'Student'), getSubjectAnalytics);
+router.get('/my-report', authorize('Student'), getMyReport);
 
 module.exports = router;

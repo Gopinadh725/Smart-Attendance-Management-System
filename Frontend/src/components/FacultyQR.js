@@ -1,45 +1,53 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 import axios from 'axios';
-import { QRCodeSVG } from 'qrcode.react'; // Updated library usage
 
 const FacultyQR = ({ subjectId }) => {
-    const [qrData, setQrData] = useState(null);
+    const [token, setToken] = useState('');
     const [timeLeft, setTimeLeft] = useState(0);
 
-    const handleGenerate = async () => {
+    const getNewToken = async () => {
         try {
             const res = await axios.post('/api/attendance/generate', { subjectId }, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
-            setQrData(res.data);
-            // Calculate seconds until expiration
-            setTimeLeft(Math.floor((new Date(res.data.expiresAt) - new Date()) / 1000));
+            setToken(res.data.token);
+            setTimeLeft(res.data.expiresIn);
         } catch (err) {
-            alert(err.response?.data?.message || "Error generating QR");
+            console.error("Attempt limit reached or error");
         }
     };
 
     useEffect(() => {
-        if (timeLeft > 0) {
-            const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [timeLeft]);
+        getNewToken();
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    getNewToken(); // Fetch new token when current one expires
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [subjectId]);
 
     return (
-        <div className="p-4 border rounded">
-            <h3>Generate Attendance QR</h3>
-            <button onClick={handleGenerate} disabled={qrData?.attemptsLeft === 0}>
-                Generate QR ({qrData?.attemptsLeft ?? 5} attempts left)
-            </button>
-
-            {timeLeft > 0 && qrData && (
-                <div className="mt-4">
-                    <QRCodeSVG value={qrData.token} size={200} />
-                    <p>Expires in: {timeLeft} seconds</p>
-                </div>
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+            <h3>Scan to Mark Attendance</h3>
+            {token ? (
+                <>
+                    <QRCodeCanvas value={token} size={256} />
+                    <p style={{ marginTop: '10px', color: 'red' }}>
+                        QR refreshes in: {timeLeft}s
+                    </p>
+                </>
+            ) : (
+                <p>Maximum attempts reached for today.</p>
             )}
-            {timeLeft === 0 && qrData && <p className="text-red-500">QR Expired. Generate again.</p>}
         </div>
     );
 };
+
+export default FacultyQR;

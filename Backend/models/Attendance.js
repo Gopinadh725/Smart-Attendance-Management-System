@@ -11,17 +11,28 @@ const attendanceSchema = new mongoose.Schema({
         ref: 'User', 
         required: true 
     },
-    date: { type: Date, default: Date.now },
-    qrCodeConfig: {
-        token: { type: String }, // Secure token generated for the QR
-        expiresAt: { type: Date }, // Time-limited restriction 
-        attempts: { type: Number, default: 0, max: 5 } // 5-attempt restriction 
+    date: { 
+        type: Date, 
+        required: true 
     },
-    presentStudents: [{
-        studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        scannedAt: { type: Date, default: Date.now }
+    students: [{
+        studentId: { 
+            type: mongoose.Schema.Types.ObjectId, 
+            ref: 'User' 
+        },
+        status: { 
+            type: String, 
+            enum: ['Present', 'Absent'], 
+            default: 'Absent' 
+        }
     }],
-    isLocked: { type: Boolean, default: false } // Faculty can lock session after editing 
-});
+    isLocked: { 
+        type: Boolean, 
+        default: false 
+    }
+}, { timestamps: true });
+
+// Ensure one attendance record per subject per date
+attendanceSchema.index({ subject: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

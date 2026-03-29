@@ -1,84 +1,121 @@
+const mongoose = require('mongoose');
 const Attendance = require('../models/Attendance');
-const crypto = require('crypto'); // Built-in Node.js module for security
+const Subject = require('../models/Subject');
+const User = require('../models/User');
 
-// 1. Generate QR Code Session
-exports.generateQR = async (req, res) => {
+// @desc    Mark attendance
+// @route   POST /api/attendance/mark
+// @access  Private/Faculty
+exports.markAttendance = async (req, res) => {
     try {
-        const { subjectId } = req.body;
-        const facultyId = req.user.id;
+        const { subjectId, date, students } = req.body;
+        const mongoose = require('mongoose');
 
-        // Check for an existing session for this subject today
-        let session = await Attendance.findOne({
-            subject: subjectId,
-            faculty: facultyId,
-            date: { $gte: new Date().setHours(0,0,0,0) }
-        });
+        // Filter out any mock/invalid student IDs (like "1", "2", "3") before saving
+        const validStudents = students.filter(s => 
+            s.studentId && mongoose.Types.ObjectId.isValid(s.studentId)
+        );
 
-        if (!session) {
-            // Create new session if none exists
-            session = new Attendance({
-                subject: subjectId,
-                faculty: facultyId,
-                qrCodeConfig: { attempts: 0 }
-            });
+        if (validStudents.length === 0) {
+            return res.status(400).json({ message: 'No valid student IDs provided' });
         }
 
-        // Check the 5-attempt limit as per abstract 
-        if (session.qrCodeConfig.attempts >= 5) {
-            return res.status(403).json({ message: "Maximum QR generation attempts (5) reached for this session." });
-        }
+        // Find and update or create
+        const attendance = await Attendance.findOneAndUpdate(
+            { subject: subjectId, date: new Date(date) },
+            { 
+                faculty: req.user._id,
+                students: validStudents 
+            },
+            { upsert: true, new: true }
+        );
 
-        // Generate a random secure token and set expiration (e.g., 60 seconds)
-        const newToken = crypto.randomBytes(32).toString('hex');
-        const expiration = new Date(Date.now() + 60 * 1000); // 1 minute limit 
-
-        session.qrCodeConfig.token = newToken;
-        session.qrCodeConfig.expiresAt = expiration;
-        session.qrCodeConfig.attempts += 1;
-
-        await session.save();
-
-        // Send token to frontend (Frontend will convert this string into a QR image)
-        res.status(200).json({ 
-            token: newToken, 
-            expiresAt: expiration,
-            attemptsLeft: 5 - session.qrCodeConfig.attempts 
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(200).json(attendance);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
 
-exports.scanQR = async (req, res) => {
+// @desc    Get attendance for a subject on a specific date
+// @route   GET /api/attendance/:subjectId/:date
+// @access  Private/Faculty/Admin
+exports.getAttendanceByDate = async (req, res) => {
     try {
-        const { token } = req.body;
-        const studentId = req.user.id;
+        const attendance = await Attendance.findOne({ 
+            subject: req.params.subjectId, 
+            date: new Date(req.params.date) 
+        }).populate('students.studentId', 'name email rollNumber');
 
-        // Find the active session with this token
-        const session = await Attendance.findOne({
-            "qrCodeConfig.token": token,
-            "qrCodeConfig.expiresAt": { $gt: new Date() } // Must not be expired 
+        if (!attendance) {
+            return res.status(404).json({ message: 'No attendance record found for this date' });
+        }
+
+        res.json(attendance);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Get attendance analytics for a subject
+// @route   GET /api/attendance/analytics/:subjectId
+// @access  Private/Faculty/Admin/Student
+exports.getSubjectAnalytics = async (req, res) => {
+    try {
+        const attendances = await Attendance.find({ subject: req.params.subjectId });
+        
+        // Calculate percentages per student
+        const studentStats = {};
+        let totalClasses = attendances.length;
+
+        attendances.forEach(record => {
+            record.students.forEach(s => {
+                if (!studentStats[s.studentId]) {
+                    studentStats[s.studentId] = { present: 0, total: 0 };
+                }
+                if (s.status === 'Present') {
+                    studentStats[s.studentId].present += 1;
+                }
+                studentStats[s.studentId].total += 1;
+            });
         });
 
-        if (!session) {
-            return res.status(400).json({ message: "Invalid or Expired QR Code" });
+        res.json({ totalClasses, studentStats });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Get student's own attendance report
+// @route   GET /api/attendance/my-report
+// @access  Private/Student
+exports.getMyReport = async (req, res) => {
+    try {
+        const subjects = await Subject.find({ enrolledStudents: req.user.id });
+        const report = [];
+
+        for (const subject of subjects) {
+            const attendances = await Attendance.find({ subject: subject._id });
+            let present = 0;
+            let total = attendances.length;
+
+            attendances.forEach(record => {
+                const studentRecord = record.students.find(s => s.studentId.toString() === req.user.id);
+                if (studentRecord && studentRecord.status === 'Present') {
+                    present++;
+                }
+            });
+
+            report.push({
+                subjectName: subject.subjectName,
+                subjectCode: subject.subjectCode,
+                present,
+                total,
+                percentage: total > 0 ? ((present / total) * 100).toFixed(2) : 0
+            });
         }
 
-        // Check if student is already marked present
-        const alreadyPresent = session.presentStudents.find(
-            (s) => s.studentId.toString() === studentId
-        );
-
-        if (alreadyPresent) {
-            return res.status(400).json({ message: "Attendance already recorded" });
-        }
-
-        // Add student to present list
-        session.presentStudents.push({ studentId });
-        await session.save();
-
-        res.status(200).json({ message: "Attendance marked successfully!" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.json(report);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
     }
 };
