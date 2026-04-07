@@ -85,6 +85,57 @@ exports.getSubjectAnalytics = async (req, res) => {
     }
 };
 
+// @desc    Get Overall Student Dashboard Stats
+// @route   GET /api/attendance/student-stats
+// @access  Private/Student
+exports.getStudentStats = async (req, res) => {
+    try {
+        const studentId = req.user.id;
+        // Find all subjects this student is enrolled in
+        const subjects = await Subject.find({ enrolledStudents: studentId });
+        
+        let totalClassesAcrossSubjects = 0;
+        let totalPresentAcrossSubjects = 0;
+        const subjectWiseData = [];
+
+        for (const subject of subjects) {
+            const attendances = await Attendance.find({ subject: subject._id });
+            let subjectPresent = 0;
+            let subjectTotal = attendances.length;
+
+            attendances.forEach(record => {
+                const studentRecord = record.students.find(s => s.studentId.toString() === studentId);
+                if (studentRecord && studentRecord.status === 'Present') {
+                    subjectPresent++;
+                }
+            });
+
+            totalClassesAcrossSubjects += subjectTotal;
+            totalPresentAcrossSubjects += subjectPresent;
+
+            subjectWiseData.push({
+                name: subject.subjectName,
+                code: subject.subjectCode,
+                percent: subjectTotal > 0 ? Math.round((subjectPresent / subjectTotal) * 100) : 0
+            });
+        }
+
+        const overallPercentage = totalClassesAcrossSubjects > 0 
+            ? ((totalPresentAcrossSubjects / totalClassesAcrossSubjects) * 100).toFixed(1) 
+            : 0;
+
+        res.json({
+            overallPercentage,
+            totalClasses: totalClassesAcrossSubjects,
+            totalPresent: totalPresentAcrossSubjects,
+            lateMarks: 0, // Placeholder if you don't have late logic yet
+            subjectWiseData
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // @desc    Get student's own attendance report
 // @route   GET /api/attendance/my-report
 // @access  Private/Student

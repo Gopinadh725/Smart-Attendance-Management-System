@@ -4,12 +4,14 @@ const {
     markAttendance, 
     getAttendanceByDate, 
     getSubjectAnalytics, 
-    getMyReport 
+    getMyReport,
+    getStudentStats
 } = require('../controllers/attendanceController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.use(protect);
 
+router.get('/student-stats', authorize('Student'), getStudentStats);
 router.post('/mark', authorize('Faculty', 'Admin'), markAttendance);
 router.get('/:subjectId/:date', authorize('Faculty', 'Admin'), getAttendanceByDate);
 router.get('/analytics/:subjectId', authorize('Faculty', 'Admin', 'Student'), getSubjectAnalytics);
