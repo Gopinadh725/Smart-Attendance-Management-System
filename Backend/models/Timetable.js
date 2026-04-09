@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const timetableSchema = new mongoose.Schema({
+    // --- ADDED DATE FIELD ---
+    date: {
+        type: Date,
+        required: true
+    },
     day: {
         type: String,
         required: true,

@@ -26,12 +26,9 @@ const autoEnrollStudent = async (studentId, section, semester) => {
 };
 
 // @desc    Register a new user
-// @route   POST /api/auth/register
-// @access  Public
 exports.register = async (req, res) => {
     try {
         const { name, email, password, role, rollNumber, section, semester } = req.body;
-
         const userExists = await User.findOne({ email });
 
         if (userExists) {
@@ -58,38 +55,31 @@ exports.register = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                rollNumber: user.rollNumber, // Added rollNumber
                 token: generateToken(user._id, user.role)
             });
         } else {
             res.status(400).json({ message: 'Invalid user data' });
         }
     } catch (error) {
-        console.error("Register Error:", error);
         res.status(500).json({ message: error.message });
     }
 };
 
 // @desc    Authenticate user & get token
-// @route   POST /api/auth/login
-// @access  Public
 exports.login = async (req, res) => {
     try {
         const { email, password, deviceId } = req.body;
-
         const user = await User.findOne({ email });
 
         if (user && (await user.matchPassword(password))) {
-            // Device Binding Logic
-            // If deviceId is provided (from frontend fingerprinting)
             if (deviceId) {
                 if (!user.deviceId) {
-                    // First login, bind device
                     user.deviceId = deviceId;
                     await user.save();
                 } else if (user.deviceId !== deviceId) {
-                    // Mismatch
                     return res.status(403).json({ 
-                        message: 'Access denied: This account is linked to another device. Please contact Admin to reset.' 
+                        message: 'Access denied: Linked to another device.' 
                     });
                 }
             }
@@ -99,16 +89,17 @@ exports.login = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                rollNumber: user.rollNumber, // Added rollNumber
                 token: generateToken(user._id, user.role)
             });
         } else {
             res.status(401).json({ message: 'Invalid email or password' });
         }
     } catch (error) {
-        console.error("Login Error:", error);
         res.status(500).json({ message: error.message });
     }
 };
+
 
 // @desc    Forgot Password
 // @route   POST /api/auth/forgotpassword

@@ -14,22 +14,34 @@ const StudentDashboard = () => {
     });
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                const token = localStorage.getItem('token'); // or from AuthContext
-                const res = await axios.get('http://localhost:5000/api/attendance/student-stats', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setStats(res.data);
-                setLoading(false);
-            } catch (err) {
-                console.error("Error fetching stats", err);
-                setLoading(false);
+useEffect(() => {
+    const fetchDashboardData = async () => {
+        try {
+            // Log this to your browser console to see if it's null!
+            const token = localStorage.getItem('token'); 
+            console.log("Using Token:", token);
+
+            if (!token) {
+                console.error("No token found! Redirecting to login...");
+                return;
             }
-        };
-        fetchDashboardData();
-    }, []);
+
+            const res = await axios.get('http://localhost:5000/api/attendance/student-stats', {
+                headers: { 
+                    // Make sure 'Bearer' has a space after it
+                    Authorization: `Bearer ${token}` 
+                }
+            });
+            
+            setStats(res.data);
+            setLoading(false);
+        } catch (err) {
+            console.error("Error fetching stats:", err.response?.data || err.message);
+            setLoading(false);
+        }
+    };
+    fetchDashboardData();
+}, []);
 
     const pieData = [
         { name: 'Present', value: Number(stats.totalPresent), color: '#10b981' },

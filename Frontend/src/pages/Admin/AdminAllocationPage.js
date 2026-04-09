@@ -1,18 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-    Calendar, 
-    Clock, 
-    Book, 
-    User as UserIcon, 
-    Plus, 
-    Trash2, 
-    Edit3,
-    TrendingUp,
-    Briefcase,
-    Layers,
-    AlertTriangle,
-    Info
+    Calendar, Clock, Book, User as UserIcon, Plus, Trash2, Edit3 
 } from 'lucide-react';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
@@ -23,11 +12,11 @@ const AdminAllocationPage = () => {
     const [faculties, setFaculties] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    
     const [editMode, setEditMode] = useState(false);
     const [editingId, setEditingId] = useState(null);
     
     const [formData, setFormData] = useState({
+        date: new Date().toISOString().split('T')[0], // New Date Field
         day: 'Monday',
         startTime: '09:00',
         endTime: '10:00',
@@ -52,11 +41,17 @@ const AdminAllocationPage = () => {
             setFaculties(userRes.data.filter(u => u.role === 'Faculty'));
             setLoading(false);
         } catch (error) {
-            console.error("Fetch Error Details:", error.response || error);
-            const msg = error.response?.data?.message || 'Check connection or login again';
-            toast.error(`Fetch failed: ${msg}`);
+            toast.error('Fetch failed');
             setLoading(false);
         }
+    };
+
+    // Helper to sync Day dropdown with Date picker
+    const handleDateChange = (e) => {
+        const selectedDate = e.target.value;
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayName = days[new Date(selectedDate).getDay()];
+        setFormData({ ...formData, date: selectedDate, day: dayName });
     };
 
     const handleSubmit = async (e) => {
@@ -64,20 +59,21 @@ const AdminAllocationPage = () => {
         try {
             if (editMode) {
                 await api.put(`/allocations/${editingId}`, formData);
-                toast.success('Allocation updated successfully');
+                toast.success('Allocation updated');
             } else {
                 await api.post('/allocations', formData);
-                toast.success('Allocation created successfully');
+                toast.success('Allocation created');
             }
             handleCloseModal();
             fetchData();
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Conflict detected or server error');
+            toast.error(error.response?.data?.message || 'Conflict detected');
         }
     };
 
     const handleEdit = (item) => {
         setFormData({
+            date: item.date ? item.date.split('T')[0] : new Date().toISOString().split('T')[0],
             day: item.day,
             startTime: item.startTime,
             endTime: item.endTime,
@@ -95,6 +91,7 @@ const AdminAllocationPage = () => {
         setEditMode(false);
         setEditingId(null);
         setFormData({
+            date: new Date().toISOString().split('T')[0],
             day: 'Monday',
             startTime: '09:00',
             endTime: '10:00',
@@ -104,117 +101,72 @@ const AdminAllocationPage = () => {
         });
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to remove this allocation?')) {
-            try {
-                await api.delete(`/allocations/${id}`);
-                toast.success('Allocation removed');
-                fetchData();
-            } catch (error) {
-                toast.error('Failed to remove allocation');
-            }
-        }
-    };
-
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-8 animate-fade-in">
-            {/* Header */}
+        <div className="p-6 max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                        Timetable Allocation
-                    </h1>
-                    <p className="mt-2 text-slate-500 dark:text-slate-400">
-                        Assign subjects and periods to faculty members.
-                    </p>
-                </div>
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowModal(true)}
-                    className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-primary-500/25"
-                >
-                    <Plus size={20} />
-                    New Allocation
-                </motion.button>
+                <h1 className="text-3xl font-extrabold">Timetable Allocation</h1>
+                <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-xl">
+                    <Plus size={20} /> New Allocation
+                </button>
             </div>
 
-            {/* Timetable Grid/List */}
+            {/* Allocation Display Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {allocations.map((item, idx) => (
-                    <motion.div
-                        key={item._id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className="glass p-6 rounded-2xl relative group overflow-hidden"
-                    >
+                {allocations.map((item) => (
+                    <div key={item._id} className="glass p-6 rounded-2xl relative shadow-sm border border-slate-100">
                         <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-xl text-primary-600 dark:text-primary-400">
-                                <Book size={24} />
-                            </div>
+                            <div className="p-3 bg-primary-100 rounded-xl text-primary-600"><Book size={24} /></div>
                             <div className="flex items-center gap-1">
-                                <button 
-                                    onClick={() => handleEdit(item)}
-                                    className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-colors"
-                                >
-                                    <Edit3 size={18} />
-                                </button>
-                                <button 
-                                    onClick={() => handleDelete(item._id)}
-                                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
+                                <button onClick={() => handleEdit(item)} className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-colors"><Edit3 size={18} /></button>
+                                <button onClick={() => api.delete(`/allocations/${item._id}`).then(fetchData)} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
                             </div>
                         </div>
-                        
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-                            {item.subject?.subjectName}
-                        </h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                            Code: {item.subject?.subjectCode} | Section: {item.section}
-                        </p>
-
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                        <h3 className="text-lg font-bold">{item.subject?.subjectName}</h3>
+                        <p className="text-sm text-slate-500 mb-4">Code: {item.subject?.subjectCode} | Sec: {item.section}</p>
+                        <div className="space-y-2 text-sm text-slate-600">
+                            <div className="flex items-center gap-2">
                                 <Calendar size={16} />
-                                <span>{item.day}</span>
+                                <span>{new Date(item.date).toLocaleDateString('en-GB')} ({item.day})</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                            <div className="flex items-center gap-2">
                                 <Clock size={16} />
                                 <span>{item.startTime} - {item.endTime}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                            <div className="flex items-center gap-2">
                                 <UserIcon size={16} />
                                 <span>Faculty: {item.faculty?.name || 'Unknown'}</span>
                             </div>
                         </div>
-
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/5 -mr-16 -mt-16 rounded-full" />
-                    </motion.div>
+                    </div>
                 ))}
             </div>
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="bg-white dark:bg-slate-900 rounded-3xl p-8 w-full max-w-md relative z-10 shadow-2xl border border-white/20 dark:border-slate-800"
-                    >
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-slate-900 rounded-3xl p-8 w-full max-w-md relative z-10 shadow-2xl">
                         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
                             {editMode ? <Edit3 className="text-primary-600" /> : <Plus className="text-primary-600" />}
                             {editMode ? 'Edit Allocation' : 'Add New Allocation'}
                         </h2>
                         
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* --- NEW DATE FIELD --- */}
+                            <div className="space-y-1">
+                                <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Date (DD/MM/YYYY)</label>
+                                <input 
+                                    type="date"
+                                    required
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 focus:ring-2 focus:ring-primary-500 outline-none"
+                                    value={formData.date}
+                                    onChange={handleDateChange}
+                                />
+                            </div>
+
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Day</label>
                                 <select 
-                                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 focus:ring-2 focus:ring-primary-500 transition-all outline-none"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 outline-none"
                                     value={formData.day}
                                     onChange={(e) => setFormData({...formData, day: e.target.value})}
                                 >
@@ -227,68 +179,36 @@ const AdminAllocationPage = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Start Time</label>
-                                    <input 
-                                        type="time"
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 focus:ring-2 focus:ring-primary-500 outline-none"
-                                        value={formData.startTime}
-                                        onChange={(e) => setFormData({...formData, startTime: e.target.value})}
-                                    />
+                                    <input type="time" className="w-full bg-slate-50 rounded-xl p-3 outline-none" value={formData.startTime} onChange={(e) => setFormData({...formData, startTime: e.target.value})} />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">End Time</label>
-                                    <input 
-                                        type="time"
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 focus:ring-2 focus:ring-primary-500 outline-none"
-                                        value={formData.endTime}
-                                        onChange={(e) => setFormData({...formData, endTime: e.target.value})}
-                                    />
+                                    <input type="time" className="w-full bg-slate-50 rounded-xl p-3 outline-none" value={formData.endTime} onChange={(e) => setFormData({...formData, endTime: e.target.value})} />
                                 </div>
                             </div>
 
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Subject</label>
-                                <select 
-                                    required
-                                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 focus:ring-2 focus:ring-primary-500 outline-none"
-                                    value={formData.subjectId}
-                                    onChange={(e) => setFormData({...formData, subjectId: e.target.value})}
-                                >
+                                <select required className="w-full bg-slate-50 rounded-xl p-3 outline-none" value={formData.subjectId} onChange={(e) => setFormData({...formData, subjectId: e.target.value})}>
                                     <option value="">Select Subject</option>
-                                    {subjects.map(s => (
-                                        <option key={s._id} value={s._id}>
-                                            {s.subjectName} (Sec: {s.section} | Sem: {s.semester})
-                                        </option>
-                                    ))}
+                                    {subjects.map(s => <option key={s._id} value={s._id}>{s.subjectName}</option>)}
                                 </select>
                             </div>
 
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Faculty</label>
-                                <select 
-                                    required
-                                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 focus:ring-2 focus:ring-primary-500 outline-none"
-                                    value={formData.facultyId}
-                                    onChange={(e) => setFormData({...formData, facultyId: e.target.value})}
-                                >
+                                <select required className="w-full bg-slate-50 rounded-xl p-3 outline-none" value={formData.facultyId} onChange={(e) => setFormData({...formData, facultyId: e.target.value})}>
                                     <option value="">Select Faculty</option>
-                                    {faculties.map(f => (
-                                        <option key={f._id} value={f._id}>{f.name}</option>
-                                    ))}
+                                    {faculties.map(f => <option key={f._id} value={f._id}>{f.name}</option>)}
                                 </select>
                             </div>
 
                             <div className="space-y-1">
                                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Section</label>
-                                <input 
-                                    type="text"
-                                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl p-3 focus:ring-2 focus:ring-primary-500 outline-none"
-                                    placeholder="e.g. A"
-                                    value={formData.section}
-                                    onChange={(e) => setFormData({...formData, section: e.target.value})}
-                                />
+                                <input type="text" className="w-full bg-slate-50 rounded-xl p-3 outline-none" value={formData.section} onChange={(e) => setFormData({...formData, section: e.target.value})} />
                             </div>
 
-                            <button className="w-full bg-primary-600 text-white py-4 rounded-xl font-bold hover:bg-primary-700 transition-all shadow-lg hover:shadow-primary-500/25 mt-4">
+                            <button className="w-full bg-primary-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-primary-700 transition-all">
                                 {editMode ? 'Update Allocation' : 'Create Allocation'}
                             </button>
                         </form>

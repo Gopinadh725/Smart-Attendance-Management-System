@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Smartphone, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -26,6 +27,25 @@ const LoginPage = () => {
             toast.error(result.message);
         }
     };
+
+    const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+        const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+        
+        // --- CRITICAL FIX START ---
+        // Ensure the backend sends 'token' and you save it as 'token'
+        if (res.data.token) {
+            localStorage.setItem('token', res.data.token); 
+            console.log("Token saved successfully!");
+        }
+        // --- CRITICAL FIX END ---
+
+        navigate('/dashboard'); // or wherever your dashboard route is
+    } catch (err) {
+        console.error("Login error", err);
+    }
+};
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">

@@ -18,8 +18,17 @@ export const AuthProvider = ({ children }) => {
         initFingerprint();
 
         const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
+        const token = localStorage.getItem('token');
+
+        // Restore session if token and user data are present
+        if (storedUser && token) {
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch (err) {
+                console.error("Failed to parse stored user", err);
+                localStorage.removeItem('user');
+                localStorage.removeItem('token');
+            }
         }
         setLoading(false);
     }, []);
@@ -31,8 +40,16 @@ export const AuthProvider = ({ children }) => {
                 password, 
                 deviceId 
             });
+
+            // Set user state and local storage
             setUser(data);
             localStorage.setItem('user', JSON.stringify(data));
+            
+            // Save the token separately for cleaner API header access
+            if (data.token) {
+                localStorage.setItem('token', data.token);
+            }
+
             return { success: true };
         } catch (error) {
             return { 
@@ -45,6 +62,8 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setUser(null);
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        // Optional: clear any other session-specific data
     };
 
     const register = async (userData) => {
@@ -52,6 +71,9 @@ export const AuthProvider = ({ children }) => {
             const { data } = await axios.post('http://localhost:5000/api/auth/register', userData);
             setUser(data);
             localStorage.setItem('user', JSON.stringify(data));
+            if (data.token) {
+                localStorage.setItem('token', data.token);
+            }
             return { success: true };
         } catch (error) {
             return { 
