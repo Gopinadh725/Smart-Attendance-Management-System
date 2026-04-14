@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Subject = require('../models/Subject');
+const Attendance = require('../models/Attendance');
 
 const autoEnrollStudent = async (studentId, section, semester) => {
     if (!section || !semester) return;
@@ -15,6 +16,47 @@ const autoEnrollStudent = async (studentId, section, semester) => {
         console.error("Auto-Enroll Error:", err);
     }
 };
+
+
+// @desc    Get Admin Dashboard Stats
+// @route   GET /api/admin/stats
+// @access  Private/Admin
+exports.getDashboardStats = async (req, res) => {
+    try {
+        // Run counts in parallel for performance
+        const [totalStudents, totalFaculty, totalSubjects, allAttendance] = await Promise.all([
+            User.countDocuments({ role: 'Student' }),
+            User.countDocuments({ role: 'Faculty' }),
+            Subject.countDocuments({}),
+            Attendance.find({})
+        ]);
+
+        // Calculate Global Average Attendance
+        let totalPresent = 0;
+        let totalRecords = 0;
+
+        allAttendance.forEach(session => {
+            session.students.forEach(s => {
+                totalRecords++;
+                if (s.status === 'Present') totalPresent++;
+            });
+        });
+
+        const avgAttendance = totalRecords > 0 
+            ? ((totalPresent / totalRecords) * 100).toFixed(1) 
+            : 0;
+
+        res.json({
+            totalStudents,
+            totalFaculty,
+            totalSubjects,
+            avgAttendance: `${avgAttendance}%`
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 
 // @desc    Create new user (by Admin)
 // @route   POST /api/admin/user

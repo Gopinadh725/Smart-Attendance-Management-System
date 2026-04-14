@@ -1,27 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-    Users, 
-    BookOpen, 
-    CheckCircle, 
-    AlertCircle, 
-    TrendingUp,
-    Calendar,
-    ArrowUpRight,
-    Search,
-    RefreshCw
-} from 'lucide-react';
-import { 
-    BarChart, 
-    Bar, 
-    XAxis, 
-    YAxis, 
-    CartesianGrid, 
-    Tooltip, 
-    ResponsiveContainer,
-    AreaChart,
-    Area
-} from 'recharts';
+import { Users, BookOpen, CheckCircle, TrendingUp, Calendar, RefreshCw } from 'lucide-react';
+import { Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis } from 'recharts';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -32,8 +12,10 @@ const AdminDashboard = () => {
         totalStudents: 0,
         totalFaculty: 0,
         totalSubjects: 0,
-        avgAttendance: 0
+        avgAttendance: '0%'
     });
+    const [loading, setLoading] = useState(true);
+    const [syncing, setSyncing] = useState(false);
 
     const chartData = [
         { name: 'Mon', attendance: 85 },
@@ -43,36 +25,33 @@ const AdminDashboard = () => {
         { name: 'Fri', attendance: 95 },
     ];
 
-    const StatCard = ({ title, value, icon: Icon, color, trend }) => (
-        <motion.div 
-            whileHover={{ y: -5 }}
-            className="glass p-6 rounded-3xl"
-        >
-            <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-2xl ${color}`}>
-                    <Icon className="text-white" size={24} />
-                </div>
-                {trend && (
-                    <div className="flex items-center text-emerald-500 text-xs font-bold">
-                        <TrendingUp size={14} className="mr-1" />
-                        {trend}
-                    </div>
-                )}
-            </div>
-            <p className="text-slate-500 text-sm font-medium">{title}</p>
-            <h3 className="text-2xl font-bold mt-1">{value}</h3>
-        </motion.div>
-    );
+    useEffect(() => {
+        fetchStats();
+    }, []);
 
-    const [syncing, setSyncing] = useState(false);
+    const fetchStats = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const { data } = await axios.get('http://localhost:5000/api/admin/stats', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setStats(data);
+        } catch (error) {
+            console.error("Error fetching admin stats", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSync = async () => {
         setSyncing(true);
         try {
+            const token = localStorage.getItem('token');
             const { data } = await axios.post('http://localhost:5000/api/subject/sync', {}, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                headers: { Authorization: `Bearer ${token}` }
             });
             toast.success(data.message);
+            fetchStats(); // Refresh stats after sync
         } catch (error) {
             toast.error(error.response?.data?.message || 'Sync failed');
         } finally {
@@ -80,12 +59,24 @@ const AdminDashboard = () => {
         }
     };
 
+    const StatCard = ({ title, value, icon: Icon, color }) => (
+        <motion.div whileHover={{ y: -5 }} className="glass p-6 rounded-3xl">
+            <div className="flex justify-between items-start mb-4">
+                <div className={`p-3 rounded-2xl ${color}`}>
+                    <Icon className="text-white" size={24} />
+                </div>
+            </div>
+            <p className="text-slate-500 text-sm font-medium">{title}</p>
+            <h3 className="text-2xl font-bold mt-1">{loading ? '...' : value}</h3>
+        </motion.div>
+    );
+
     return (
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold">Admin Overview</h1>
-                    <p className="text-slate-500">Welcome back, {user?.name}. Here's what's happening today.</p>
+                    <p className="text-slate-500">Welcome back, {user?.name}. Real-time data is now active.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <button 
@@ -96,18 +87,14 @@ const AdminDashboard = () => {
                         <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
                         {syncing ? 'Syncing...' : 'Sync Student Data'}
                     </button>
-                    <button className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium flex items-center gap-2">
-                        <Calendar size={18} />
-                        Last 30 Days
-                    </button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Total Students" value="1,280" icon={Users} color="bg-blue-500" trend="+12%" />
-                <StatCard title="Total Faculty" value="45" icon={Users} color="bg-indigo-500" />
-                <StatCard title="Total Subjects" value="24" icon={BookOpen} color="bg-emerald-500" />
-                <StatCard title="Avg Attendance" value="84%" icon={CheckCircle} color="bg-amber-500" trend="+5%" />
+                <StatCard title="Total Students" value={stats.totalStudents.toLocaleString()} icon={Users} color="bg-blue-500" />
+                <StatCard title="Total Faculty" value={stats.totalFaculty} icon={Users} color="bg-indigo-500" />
+                <StatCard title="Total Subjects" value={stats.totalSubjects} icon={BookOpen} color="bg-emerald-500" />
+                <StatCard title="Avg Attendance" value={stats.avgAttendance} icon={CheckCircle} color="bg-amber-500" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
